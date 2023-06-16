@@ -3,6 +3,7 @@ pragma solidity 0.8.17;
 
 import "@aave/protocol-v2/contracts/interfaces/ILendingPoolAddressesProvider.sol";
 import "@aave/protocol-v2/contracts/interfaces/IERC20.sol";
+import {Pool} from "@aave/core-v3/contracts/protocol/pool/Pool.sol";
 
 
 
@@ -11,6 +12,7 @@ contract Escrow {
         uint256 amount;
         address client;
         address freelancer;
+        address token;
         bool isPaid;
         bool isCompleted;
         uint256 completionDate;
@@ -23,8 +25,7 @@ contract Escrow {
     event PaymentCompleted(uint256 paymentId);
     event PaymentClaimed(uint256 paymentId);
     
-    constructor(address _lendingPoolAddress) {
-        lendingPool = ILendingPool(_lendingPoolAddress);
+    constructor() {
     }
     
     modifier onlyClient(uint256 paymentId) {
@@ -37,17 +38,19 @@ contract Escrow {
         _;
     }
     
-    function createPayment(address _freelancer) external payable {
+    function createPayment(address _freelancer, address _token) external payable {
         Payment memory newPayment = Payment({
             amount: msg.value,
             client: msg.sender,
             freelancer: _freelancer,
+            token: _token,
             isPaid: true,
             isCompleted: false,
             completionDate: 0
         });
         
         payments.push(newPayment);
+        Pool.supply(_token, msg.value, _freelancer);
         emit PaymentCreated(payments.length - 1);
     }
     
@@ -67,7 +70,7 @@ contract Escrow {
         require(block.timestamp >= payments[paymentId].completionDate + 15 days, "Payment cannot be claimed yet");
         
         uint256 amountToClaim = payments[paymentId].amount;
-        lendingPool.withdraw(address(this), amountToClaim);
+        lPool.withdraw(address(this), amountToClaim);
         
         payable(payments[paymentId].freelancer).transfer(amountToClaim);
         

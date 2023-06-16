@@ -19,6 +19,9 @@
     "> 5%"
   ],
   "dependencies": {
+    "@aave/core-v3": "^1.17.2",
+    "@aave/periphery-v3": "^2.4.0",
+    "@aave/protocol-v2": "^1.0.1",
     "ethers": "^5.7.2",
     "react": "^18.2.0"
   }

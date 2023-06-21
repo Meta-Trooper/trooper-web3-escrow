@@ -24,7 +24,9 @@ contract Escrow {
     event PaymentCompleted(uint256 paymentId);
     event PaymentClaimed(uint256 paymentId);
     
-    constructor() {
+    constructor(address _stablecoin, address _aaveStablecoinPool) {
+        stableCoin = IERC20(_stablecoin);
+        aaveStablecoinPool = _aaveStablecoinPool;
     }
     
     modifier onlyEmployer(uint256 paymentId) {
@@ -53,7 +55,7 @@ contract Escrow {
         });
         
         payments.push(newPayment);
-        Pool.supply(_token, msg.value, _gamer);
+        Pool.supply(stableCoin, msg.value, _gamer);
         emit PaymentCreated(payments.length - 1);
     }
     

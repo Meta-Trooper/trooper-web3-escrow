@@ -10,10 +10,9 @@ import {Pool} from "@aave/core-v3/contracts/protocol/pool/Pool.sol";
 contract Escrow {
     struct Payment {
         uint256 amount;
-        address client;
-        address freelancer;
-        address token;
-        bool isPaid;
+        address employer;
+        address gamer;
+        bool isDeposited;
         bool isCompleted;
         uint256 completionDate;
     }
@@ -28,34 +27,38 @@ contract Escrow {
     constructor() {
     }
     
-    modifier onlyClient(uint256 paymentId) {
-        require(msg.sender == payments[paymentId].client, "Only the client can call this function");
+    modifier onlyEmployer(uint256 paymentId) {
+        require(msg.sender == payments[paymentId].employer, "Only the employer can call this function");
+        _;
+    }
+
+    modifier bothEmployerAndTrooper(uint256 paymentId) {
+        require(msg.sender == payments[paymentId].employer, "Only the employer and Trooper can call this function");
         _;
     }
     
-    modifier onlyFreelancer(uint256 paymentId) {
-        require(msg.sender == payments[paymentId].freelancer, "Only the freelancer can call this function");
+    modifier onlyGamer(uint256 paymentId) {
+        require(msg.sender == payments[paymentId].gamer, "Only the gamer can call this function");
         _;
     }
     
-    function createPayment(address _freelancer, address _token) external payable {
+    function createPayment(address _gamer) external payable {
         Payment memory newPayment = Payment({
             amount: msg.value,
-            client: msg.sender,
-            freelancer: _freelancer,
-            token: _token,
-            isPaid: true,
+            employer: msg.sender,
+            gamer: _gamer,
+            isDeposited: true,
             isCompleted: false,
             completionDate: 0
         });
         
         payments.push(newPayment);
-        Pool.supply(_token, msg.value, _freelancer);
+        Pool.supply(_token, msg.value, _gamer);
         emit PaymentCreated(payments.length - 1);
     }
     
-    function confirmCompletion(uint256 paymentId) external onlyClient(paymentId) {
-        require(payments[paymentId].isPaid, "Payment has not been made");
+    function confirmCompletion(uint256 paymentId) external bothEmployerAndTrooper(paymentId) {
+        require(payments[paymentId].isDeposited, "Payment has not been made");
         require(!payments[paymentId].isCompleted, "Payment has already been completed");
         
         payments[paymentId].isCompleted = true;
@@ -64,15 +67,15 @@ contract Escrow {
         emit PaymentCompleted(paymentId);
     }
     
-    function claimPayment(uint256 paymentId) external onlyFreelancer(paymentId) {
-        require(payments[paymentId].isPaid, "Payment has not been made");
+    function claimPayment(uint256 paymentId) external onlyGamer(paymentId) {
+        require(payments[paymentId].isDeposited, "Payment has not been made");
         require(payments[paymentId].isCompleted, "Payment has not been completed");
         require(block.timestamp >= payments[paymentId].completionDate + 15 days, "Payment cannot be claimed yet");
         
         uint256 amountToClaim = payments[paymentId].amount;
-        lPool.withdraw(address(this), amountToClaim);
+        Pool.withdraw(address(this), amountToClaim);
         
-        payable(payments[paymentId].freelancer).transfer(amountToClaim);
+        payable(payments[paymentId].gamer).transfer(amountToClaim);
         
         emit PaymentClaimed(paymentId);
     }

@@ -14,11 +14,12 @@ contract Escrow {
         address gamer;
         bool isDeposited;
         bool isCompleted;
+        bool isRefundable;
         uint256 completionDate;
     }
     
     Payment[] public payments;
-    ILendingPool public lendingPool;
+    address public trooperAddress;
     
     event PaymentCreated(uint256 paymentId);
     event PaymentCompleted(uint256 paymentId);
@@ -41,6 +42,11 @@ contract Escrow {
     
     modifier onlyGamer(uint256 paymentId) {
         require(msg.sender == payments[paymentId].gamer, "Only the gamer can call this function");
+        _;
+    }
+
+    modifier onlyTrooper(uint256 paymentId) {
+        require(msg.sender == trooperAddress, "Only Trooper can call this function");
         _;
     }
     
@@ -68,6 +74,16 @@ contract Escrow {
         
         emit PaymentCompleted(paymentId);
     }
+
+    function requestRefund(uint256 paymentId) external onlyEmployer(paymentId) {
+        require(payments[paymentId].isDeposited, "Payment has not been made");
+        require(!payments[paymentId].isCompleted, "Payment has already been completed");
+        
+        payments[paymentId].isRefundable = true;
+        payments[paymentId].completionDate = block.timestamp;
+        
+        emit PaymentCompleted(paymentId);
+    }
     
     function claimPayment(uint256 paymentId) external onlyGamer(paymentId) {
         require(payments[paymentId].isDeposited, "Payment has not been made");
@@ -81,6 +97,19 @@ contract Escrow {
         
         emit PaymentClaimed(paymentId);
     }
+
+    function approveRefund(uint256 paymentId) external onlyTrooper(paymentId) {
+        require(payments[paymentId].isDeposited, "Payment has not been made");
+        require(payments[paymentId].isRefundable, "Refund can not be made");
+        require(block.timestamp >= payments[paymentId].completionDate + 15 days, "Refund cannot be claimed yet");
+        
+        uint256 amountToRefund = payments[paymentId].amount;
+        Pool.withdraw(payments[paymentId].employer, amountToClaim);
+        
+        payable(payments[paymentId].employer).transfer(amountToClaim);
+        
+        emit PaymentClaimed(paymentId);
+    }
     
     function getPaymentCount() external view returns (uint256) {
         return payments.length;
@@ -88,5 +117,9 @@ contract Escrow {
     
     function getPayment(uint256 paymentId) external view returns (Payment memory) {
         return payments[paymentId];
+    }
+
+    function changeTrooperAddress(address newTrooperAddress) external onlyTrooper(){
+        trooperAddress = newTrooperAddress;
     }
 }
